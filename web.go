@@ -1,19 +1,62 @@
 package main
 
 import (
-	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 
+	"github.com/pquerna/ffjson/ffjson"
+
+	"github.com/news-ai/web/emails"
+	"github.com/news-ai/web/encrypt"
 	nError "github.com/news-ai/web/errors"
+
+	"github.com/news-ai/tabulae/models"
 )
 
-func verifySMTP(w http.ResponseWriter, r *http.Request) {
-	// fmt.Println(VerifySMTPAccount("mail.privateemail.com:465", "hi@abhi.co", ""))
+type SMTPResonse struct {
+	Status bool   `json:"status"`
+	Error  string `json:"error"`
+}
 
+func verifySMTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "POST":
-		fmt.Fprintf(w, "Hello")
+		buf, _ := ioutil.ReadAll(r.Body)
+
+		decoder := ffjson.NewDecoder()
+		var emailSettings models.SMTPSettings
+		err := decoder.Decode(buf, &emailSettings)
+		if err != nil {
+			nError.ReturnError(w, http.StatusInternalServerError, "SMTP error", err.Error())
+			return
+		}
+
+		userPassword, err := encrypt.DecryptString(emailSettings.EmailPassword)
+		if err != nil {
+			nError.ReturnError(w, http.StatusInternalServerError, "SMTP error", err.Error())
+			return
+		}
+
+		response := SMTPResonse{}
+
+		smtpError := emails.VerifySMTP(emailSettings.Servername, emailSettings.EmailUser, userPassword)
+
+		if smtpError == nil {
+			response.Status = true
+		} else {
+			response.Status = false
+			response.Error = smtpError.Error()
+		}
+
+		if err == nil {
+			err = ffjson.NewEncoder(w).Encode(response)
+		}
+
+		if err != nil {
+			nError.ReturnError(w, http.StatusInternalServerError, "Publication handling error", err.Error())
+		}
+
 		return
 	}
 
