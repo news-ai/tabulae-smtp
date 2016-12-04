@@ -65,7 +65,7 @@ func verifySMTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	http.HandleFunc("/", verifySMTP)         // set router
+	http.HandleFunc("/verify", verifySMTP)   // set router
 	err := http.ListenAndServe(":8080", nil) // set listen port
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
