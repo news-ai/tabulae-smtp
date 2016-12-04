@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -33,15 +32,11 @@ func verifySMTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		fmt.Println(emailSettings)
-
 		userPassword, err := encrypt.DecryptString(emailSettings.EmailPassword)
 		if err != nil {
 			nError.ReturnError(w, http.StatusInternalServerError, "SMTP error", err.Error())
 			return
 		}
-
-		fmt.Println(userPassword)
 
 		response := SMTPResonse{}
 
@@ -53,8 +48,6 @@ func verifySMTP(w http.ResponseWriter, r *http.Request) {
 			response.Status = false
 			response.Error = smtpError.Error()
 		}
-
-		fmt.Println(response)
 
 		if err == nil {
 			err = ffjson.NewEncoder(w).Encode(response)
