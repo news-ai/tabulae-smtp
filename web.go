@@ -25,7 +25,7 @@ func sendSMTP(w http.ResponseWriter, r *http.Request) {
 		buf, _ := ioutil.ReadAll(r.Body)
 
 		decoder := ffjson.NewDecoder()
-		var emailSettings models.SMTPSettings
+		var emailSettings models.SMTPEmailSettings
 		err := decoder.Decode(buf, &emailSettings)
 		if err != nil {
 			nError.ReturnError(w, http.StatusInternalServerError, "SMTP verify error", err.Error())
@@ -69,7 +69,7 @@ func verifySMTP(w http.ResponseWriter, r *http.Request) {
 		buf, _ := ioutil.ReadAll(r.Body)
 
 		decoder := ffjson.NewDecoder()
-		var emailSettings models.SMTPEmailSettings
+		var emailSettings models.SMTPSettings
 		err := decoder.Decode(buf, &emailSettings)
 		if err != nil {
 			nError.ReturnError(w, http.StatusInternalServerError, "SMTP send error", err.Error())
