@@ -14,12 +14,12 @@ import (
 	"github.com/news-ai/tabulae/models"
 )
 
-type SMTPResonse struct {
+type SMTPResponse struct {
 	Status bool   `json:"status"`
 	Error  string `json:"error"`
 }
 
-func verifySMTP(w http.ResponseWriter, r *http.Request) {
+func sendSMTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "POST":
 		buf, _ := ioutil.ReadAll(r.Body)
@@ -28,20 +28,19 @@ func verifySMTP(w http.ResponseWriter, r *http.Request) {
 		var emailSettings models.SMTPSettings
 		err := decoder.Decode(buf, &emailSettings)
 		if err != nil {
-			nError.ReturnError(w, http.StatusInternalServerError, "SMTP error", err.Error())
+			nError.ReturnError(w, http.StatusInternalServerError, "SMTP verify error", err.Error())
 			return
 		}
 
 		userPassword, err := encrypt.DecryptString(emailSettings.EmailPassword)
 		if err != nil {
-			nError.ReturnError(w, http.StatusInternalServerError, "SMTP error", err.Error())
+			nError.ReturnError(w, http.StatusInternalServerError, "SMTP verify error", err.Error())
 			return
 		}
 
-		response := SMTPResonse{}
+		smtpError := emails.SendSMTPEmail(emailSettings.Servername, emailSettings.EmailUser, userPassword, emailSettings.To, emailSettings.Subject, emailSettings.Body)
 
-		smtpError := emails.VerifySMTP(emailSettings.Servername, emailSettings.EmailUser, userPassword)
-
+		response := SMTPResponse{}
 		if smtpError == nil {
 			response.Status = true
 		} else {
@@ -54,19 +53,63 @@ func verifySMTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err != nil {
-			nError.ReturnError(w, http.StatusInternalServerError, "Publication handling error", err.Error())
+			nError.ReturnError(w, http.StatusInternalServerError, "SMTP verify error", err.Error())
 		}
 
 		return
 	}
 
-	nError.ReturnError(w, http.StatusInternalServerError, "SMTP error", "method not implemented")
+	nError.ReturnError(w, http.StatusInternalServerError, "SMTP verify error", "method not implemented")
+	return
+}
+
+func verifySMTP(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "POST":
+		buf, _ := ioutil.ReadAll(r.Body)
+
+		decoder := ffjson.NewDecoder()
+		var emailSettings models.SMTPEmailSettings
+		err := decoder.Decode(buf, &emailSettings)
+		if err != nil {
+			nError.ReturnError(w, http.StatusInternalServerError, "SMTP send error", err.Error())
+			return
+		}
+
+		userPassword, err := encrypt.DecryptString(emailSettings.EmailPassword)
+		if err != nil {
+			nError.ReturnError(w, http.StatusInternalServerError, "SMTP send error", err.Error())
+			return
+		}
+
+		smtpError := emails.VerifySMTP(emailSettings.Servername, emailSettings.EmailUser, userPassword)
+
+		response := SMTPResponse{}
+		if smtpError == nil {
+			response.Status = true
+		} else {
+			response.Status = false
+			response.Error = smtpError.Error()
+		}
+
+		if err == nil {
+			err = ffjson.NewEncoder(w).Encode(response)
+		}
+
+		if err != nil {
+			nError.ReturnError(w, http.StatusInternalServerError, "SMTP send error", err.Error())
+		}
+
+		return
+	}
+	nError.ReturnError(w, http.StatusInternalServerError, "SMTP send error", "method not implemented")
 	return
 }
 
 func main() {
-	http.HandleFunc("/verify", verifySMTP)   // set router
-	err := http.ListenAndServe(":8080", nil) // set listen port
+	http.HandleFunc("/send", sendSMTP)
+	http.HandleFunc("/verify", verifySMTP)
+	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
